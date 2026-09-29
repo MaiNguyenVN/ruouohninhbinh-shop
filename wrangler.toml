@@ -1,0 +1,16 @@
+name = "ruouohninhbinh-shop"
+type = "service"
+main = "src/index.ts"
+compatibility_date = "2024-12-16"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ruouohninhbinh-db"
+database_id = "REPLACE_WITH_YOUR_DATABASE_ID"
+
+[env.production]
+vars = { CURRENCY = "vnd", STORE_NAME = "Rượu Ó Ninh Bình" }
+secrets = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"]
+
+[env.development]
+vars = { CURRENCY = "vnd", STORE_NAME = "Rượu Ó Ninh Bình" }
