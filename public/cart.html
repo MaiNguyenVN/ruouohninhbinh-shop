@@ -11,8 +11,67 @@
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <header class="topbar"><div class="container nav"><div class="brand"><a href="/index.html">Rượu OH</a></div><nav aria-label="Điều hướng"><a href="/index.html">Cửa hàng</a><a href="/cart.html">Giỏ hàng <span id="cart-count" class="cart-badge">0</span></a></nav></div></header>
-    <main class="container page"><section class="cart-layout"><div class="cart-panel"><h1>Giỏ hàng</h1><p>Những hương vị quê nhà bạn đã chọn.</p><div id="cart-items" class="cart-items"></div></div><aside class="checkout-panel"><h2>Thông tin giao hàng</h2><form id="checkout-form" class="checkout-form"><label>Họ và tên<input type="text" name="name" autocomplete="name" required /></label><label>Email<input type="email" name="email" autocomplete="email" required /></label><label>Số điện thoại<input type="tel" name="phone" autocomplete="tel" required /></label><label>Địa chỉ giao hàng<textarea name="address" rows="4" autocomplete="street-address" required></textarea></label><div class="summary-row"><span>Tổng cộng</span><strong id="cart-total">0 ₫</strong></div><button type="submit" class="primary-btn">Thanh toán bằng Stripe</button></form></aside></section></main>
+    <header class="topbar">
+      <div class="container nav-wrap">
+        <a href="/index.html" class="brand" aria-label="Rượu OH">
+          <span class="brand-mark">R</span>
+          <span>Rượu OH</span>
+        </a>
+
+        <nav class="main-nav" aria-label="Điều hướng">
+          <a href="/index.html">Cửa hàng</a>
+          <a href="/index.html#story">Câu chuyện</a>
+          <a href="/index.html#products">Sản phẩm</a>
+          <a href="/cart.html" class="cart-link">Giỏ hàng <span id="cart-count" class="cart-badge">0</span></a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container page-shell">
+      <section class="cart-page">
+        <div class="cart-panel">
+          <div class="panel-header">
+            <p class="section-tag">Giỏ hàng</p>
+            <h1>Đặt hàng nhanh</h1>
+          </div>
+
+          <div id="cart-items" class="cart-items"></div>
+
+          <div class="cart-summary">
+            <span>Tổng tiền</span>
+            <strong id="cart-total">0₫</strong>
+          </div>
+        </div>
+
+        <aside class="checkout-panel">
+          <h2>Thông tin khách hàng</h2>
+          <form id="checkout-form" class="checkout-form">
+            <label>
+              Họ và tên
+              <input required name="name" type="text" placeholder="Nhập họ tên" />
+            </label>
+
+            <label>
+              Email
+              <input required name="email" type="email" placeholder="you@example.com" />
+            </label>
+
+            <label>
+              Số điện thoại
+              <input required name="phone" type="tel" placeholder="0909 123 456" />
+            </label>
+
+            <label>
+              Địa chỉ giao hàng
+              <textarea required name="address" rows="4" placeholder="Nhập địa chỉ chi tiết"></textarea>
+            </label>
+
+            <button type="submit" class="primary-btn full-width">Hoàn tất đơn hàng</button>
+          </form>
+        </aside>
+      </section>
+    </main>
+
     <script src="/app.js"></script>
   </body>
 </html>
