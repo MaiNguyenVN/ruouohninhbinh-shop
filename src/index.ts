@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { serveStatic } from 'hono/cloudflare-workers';
 import Stripe from 'stripe';
 
 const app = new Hono<{
@@ -19,6 +20,9 @@ const formatMoney = (value: number, currency = 'vnd') => {
   }).format(value);
 };
 
+// Serve static files from public directory
+app.use('/*', serveStatic({ root: './' }));
+
 app.get('/api/health', (c) => {
   return c.json({
     ok: true,
@@ -28,22 +32,26 @@ app.get('/api/health', (c) => {
 });
 
 app.get('/api/products', async (c) => {
-  const { results } = await c.env.DB.prepare(
-    'SELECT * FROM products WHERE stock > 0 ORDER BY id ASC'
-  ).all();
+  try {
+    const { results } = await c.env.DB.prepare(
+      'SELECT * FROM products WHERE stock > 0 ORDER BY id ASC'
+    ).all();
 
-  return c.json({
-    products: results.map((product) => ({
-      id: product.id,
-      name: product.name,
-      description: product.description,
-      price: Number(product.price),
-      image_url: product.image_url,
-      category: product.category,
-      stock: Number(product.stock),
-      formatted_price: formatMoney(Number(product.price), c.env.CURRENCY || 'vnd'),
-    })),
-  });
+    return c.json({
+      products: results.map((product) => ({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: Number(product.price),
+        image_url: product.image_url,
+        category: product.category,
+        stock: Number(product.stock),
+        formatted_price: formatMoney(Number(product.price), c.env.CURRENCY || 'vnd'),
+      })),
+    });
+  } catch (error) {
+    return c.json({ error: 'Không thể tải sản phẩm', details: String(error) }, 500);
+  }
 });
 
 app.post('/api/checkout', async (c) => {
