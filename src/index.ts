@@ -20,7 +20,38 @@ const formatMoney = (value: number, currency = 'vnd') => {
   }).format(value);
 };
 
-// Serve static files from public directory
+const buildNotificationLinks = (order: any, customer: any, items: any[]) => {
+  const itemLines = items
+    .map((item) => `- ${item.product_name} x${item.quantity} (${formatMoney(Number(item.price) * Number(item.quantity))})`)
+    .join('\n');
+
+  const emailBody = [
+    `Xin chào ${customer.name || 'Quý khách'},`,
+    '',
+    'Cảm ơn bạn đã đặt hàng tại Rượu OH Ninh Bình.',
+    '',
+    `Mã đơn hàng: ${order.order_uuid}`,
+    `Tổng tiền: ${formatMoney(Number(order.total_amount))}`,
+    '',
+    'Sản phẩm:',
+    itemLines,
+    '',
+    `Số điện thoại: ${customer.phone || 'Chưa cung cấp'}`,
+    `Địa chỉ: ${customer.address || 'Chưa cung cấp'}`,
+    '',
+    'Chúng tôi sẽ liên hệ lại để xác nhận đơn hàng trong thời gian sớm nhất.',
+    '',
+    'Trân trọng,',
+    'Rượu OH Ninh Bình',
+  ].join('\n');
+
+  const email = `mailto:orders@ruouohninhbinh.com?subject=${encodeURIComponent('Đơn hàng Rượu OH - Xác nhận')}&body=${encodeURIComponent(emailBody)}`;
+  const zaloText = `Xin chào Rượu OH, tôi muốn xác nhận đơn hàng ${order.order_uuid}. Tổng tiền: ${formatMoney(Number(order.total_amount))}.`;
+  const zalo = `https://zalo.me/0969868358?text=${encodeURIComponent(zaloText)}`;
+
+  return { email, zalo };
+};
+
 app.use('/*', serveStatic({ root: './' }));
 
 app.get('/api/health', (c) => {
@@ -52,6 +83,93 @@ app.get('/api/products', async (c) => {
   } catch (error) {
     return c.json({ error: 'Không thể tải sản phẩm', details: String(error) }, 500);
   }
+});
+
+app.post('/api/orders', async (c) => {
+  const body = await c.req.json();
+  const cart = Array.isArray(body?.cart) ? body.cart : [];
+  const customer = body?.customer || {};
+
+  if (!cart.length) {
+    return c.json({ error: 'Giỏ hàng trống.' }, 400);
+  }
+
+  if (!customer.name || !customer.email || !customer.phone || !customer.address) {
+    return c.json({ error: 'Vui lòng điền đầy đủ thông tin khách hàng.' }, 400);
+  }
+
+  const productIds = [...new Set(cart.map((item: any) => Number(item.productId)).filter(Boolean))];
+  if (!productIds.length) {
+    return c.json({ error: 'Không tìm thấy sản phẩm hợp lệ trong giỏ hàng.' }, 400);
+  }
+
+  const placeholders = productIds.map(() => '?').join(',');
+  const productRows = await c.env.DB.prepare(
+    `SELECT * FROM products WHERE id IN (${placeholders})`
+  )
+    .bind(...productIds)
+    .all();
+
+  const productMap = new Map(productRows.results.map((product) => [Number(product.id), product]));
+
+  let totalAmount = 0;
+  const orderItems: any[] = [];
+
+  for (const item of cart) {
+    const product = productMap.get(Number(item.productId));
+    if (!product) {
+      return c.json({ error: `Sản phẩm ${item.productId} không tồn tại.` }, 400);
+    }
+
+    const quantity = Number(item.quantity) || 1;
+    if (quantity <= 0) {
+      return c.json({ error: 'Số lượng sản phẩm không hợp lệ.' }, 400);
+    }
+
+    totalAmount += Number(product.price) * quantity;
+    orderItems.push({
+      product_id: Number(product.id),
+      product_name: product.name,
+      price: Number(product.price),
+      quantity,
+    });
+  }
+
+  if (totalAmount <= 0) {
+    return c.json({ error: 'Tổng đơn hàng phải lớn hơn 0.' }, 400);
+  }
+
+  const orderUuid = crypto.randomUUID();
+  const cartId = `cart_${Date.now()}`;
+
+  const orderInsert = await c.env.DB.prepare(
+    `INSERT INTO orders (order_uuid, cart_id, customer_name, customer_email, customer_phone, customer_address, total_amount, payment_status, stripe_session_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'completed', '')`
+  ).bind(
+    orderUuid,
+    cartId,
+    String(customer.name),
+    String(customer.email),
+    String(customer.phone),
+    String(customer.address),
+    totalAmount
+  ).run();
+
+  const orderId = Number(orderInsert.meta.last_row_id);
+
+  for (const item of orderItems) {
+    await c.env.DB.prepare(
+      `INSERT INTO order_items (order_id, product_id, product_name, price, quantity)
+       VALUES (?, ?, ?, ?, ?)`
+    ).bind(orderId, item.product_id, item.product_name, item.price, item.quantity).run();
+  }
+
+  return c.json({
+    ok: true,
+    order_id: orderUuid,
+    total: totalAmount,
+    message: 'Đơn hàng đã được ghi nhận. Bạn có thể xem chi tiết và gửi email/Zalo xác nhận.',
+  });
 });
 
 app.post('/api/checkout', async (c) => {
@@ -244,6 +362,38 @@ app.get('/api/orders/:orderUuid', async (c) => {
       stripe_session_id: order.stripe_session_id,
     },
     items: items.results,
+  });
+});
+
+app.post('/api/orders/:orderUuid/complete', async (c) => {
+  const orderUuid = c.req.param('orderUuid');
+  const order = await c.env.DB.prepare(
+    `SELECT * FROM orders WHERE order_uuid = ?`
+  ).bind(orderUuid).first();
+
+  if (!order) {
+    return c.json({ error: 'Không tìm thấy đơn hàng.' }, 404);
+  }
+
+  await c.env.DB.prepare(
+    `UPDATE orders SET payment_status = 'completed' WHERE order_uuid = ?`
+  ).bind(orderUuid).run();
+
+  const items = await c.env.DB.prepare(
+    `SELECT * FROM order_items WHERE order_id = ? ORDER BY id ASC`
+  ).bind(order.id).all();
+
+  const customer = {
+    name: order.customer_name,
+    email: order.customer_email,
+    phone: order.customer_phone,
+    address: order.customer_address,
+  };
+
+  return c.json({
+    ok: true,
+    message: 'Đơn hàng đã được xác nhận và thông báo đã được tạo.',
+    notification: buildNotificationLinks(order, customer, items.results),
   });
 });
 
