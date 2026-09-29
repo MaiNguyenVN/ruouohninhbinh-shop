@@ -1,11 +1,7 @@
 const CART_KEY = 'ruouohninhbinh-cart';
 
 function getCart() {
-  try {
-    return JSON.parse(localStorage.getItem(CART_KEY) || '[]');
-  } catch {
-    return [];
-  }
+  try { return JSON.parse(localStorage.getItem(CART_KEY) || '[]'); } catch { return []; }
 }
 
 function saveCart(cart) {
@@ -14,229 +10,135 @@ function saveCart(cart) {
 }
 
 function updateCartCount() {
-  const count = getCart().reduce((total, item) => total + Number(item.quantity || 0), 0);
-  document.querySelectorAll('#cart-count').forEach((el) => {
-    el.textContent = String(count);
-  });
+  const count = getCart().reduce((total, item) => total + Math.max(0, Number(item.quantity) || 0), 0);
+  document.querySelectorAll('#cart-count, #cart-count-mobile').forEach((el) => { el.textContent = String(count); });
+}
+
+function formatMoney(value) {
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(Number(value) || 0);
 }
 
 async function fetchProducts() {
-  const response = await fetch('/api/products');
-  if (!response.ok) {
-    throw new Error('Không thể tải sản phẩm');
-  }
+  const response = await fetch('/api/products', { headers: { Accept: 'application/json' } });
+  if (!response.ok) throw new Error('Không thể tải sản phẩm');
   const data = await response.json();
-  return data.products || [];
+  return Array.isArray(data.products) ? data.products : [];
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 }
 
 function addToCart(productId) {
   const cart = getCart();
-  const existingItem = cart.find((item) => Number(item.productId) === Number(productId));
-
-  if (existingItem) {
-    existingItem.quantity += 1;
-  } else {
-    cart.push({ productId: Number(productId), quantity: 1 });
-  }
-
+  const item = cart.find((entry) => Number(entry.productId) === Number(productId));
+  if (item) item.quantity = (Number(item.quantity) || 0) + 1;
+  else cart.push({ productId: Number(productId), quantity: 1 });
   saveCart(cart);
 }
 
 function renderProducts(products) {
   const container = document.querySelector('#products-grid');
   if (!container) return;
+  if (!products.length) { container.innerHTML = '<p>Hiện chưa có sản phẩm.</p>'; return; }
 
-  container.innerHTML = products
-    .map(
-      (product) => `
-        <article class="product-card">
-          <img src="${product.image_url}" alt="${product.name}" />
-          <div class="product-info">
-            <h3>${product.name}</h3>
-            <p class="product-description">${product.description || 'Sản phẩm đặc trưng Ninh Bình'}</p>
-            <div class="product-meta">
-              <span class="price">${product.formatted_price}</span>
-              <button class="secondary-btn" data-product-id="${product.id}">Thêm</button>
-            </div>
-          </div>
-        </article>
-      `
-    )
-    .join('');
+  container.innerHTML = products.map((product) => `
+    <article class="product-card">
+      <img src="${escapeHtml(product.image_url || '')}" alt="${escapeHtml(product.name)}" loading="lazy" onerror="this.src='/1000029231.jpg'" />
+      <div class="product-info">
+        <h3>${escapeHtml(product.name)}</h3>
+        <p class="product-description">${escapeHtml(product.description || 'Sản phẩm đặc trưng Ninh Bình')}</p>
+        <div class="product-meta">
+          <span class="price">${escapeHtml(product.formatted_price || formatMoney(product.price))}</span>
+          <button type="button" class="secondary-btn" data-product-id="${Number(product.id)}">Thêm vào giỏ</button>
+        </div>
+      </div>
+    </article>`).join('');
 
   container.querySelectorAll('[data-product-id]').forEach((button) => {
     button.addEventListener('click', () => {
       addToCart(button.dataset.productId);
-      updateCartCount();
+      button.textContent = 'Đã thêm ✓';
+      setTimeout(() => { button.textContent = 'Thêm vào giỏ'; }, 1200);
     });
   });
 }
 
-function renderCartPage() {
-  const cart = getCart();
+async function renderCartPage() {
   const container = document.querySelector('#cart-items');
   const totalEl = document.querySelector('#cart-total');
-
   if (!container || !totalEl) return;
-
+  const cart = getCart();
   if (!cart.length) {
-    container.innerHTML = '<div class="empty-cart">Giỏ hàng trống. Hãy quay lại cửa hàng để chọn sản phẩm.</div>';
-    totalEl.textContent = '0 ₫';
+    container.innerHTML = '<div class="empty-cart">Giỏ hàng đang trống. Hãy chọn một sản phẩm thật ngon nhé.</div>';
+    totalEl.textContent = formatMoney(0);
     return;
   }
 
-  fetchProducts()
-    .then((products) => {
-      const productMap = new Map(products.map((product) => [Number(product.id), product]));
-      let total = 0;
+  try {
+    const products = await fetchProducts();
+    const productMap = new Map(products.map((product) => [Number(product.id), product]));
+    let total = 0;
+    container.innerHTML = cart.map((item) => {
+      const product = productMap.get(Number(item.productId));
+      if (!product) return '';
+      const quantity = Math.max(1, Number(item.quantity) || 1);
+      const itemTotal = Number(product.price) * quantity;
+      total += itemTotal;
+      return `<div class="cart-item">
+        <img src="${escapeHtml(product.image_url || '')}" alt="${escapeHtml(product.name)}" loading="lazy" onerror="this.src='/1000029231.jpg'" />
+        <div class="item-info"><h3>${escapeHtml(product.name)}</h3><p class="item-price">${escapeHtml(product.formatted_price || formatMoney(product.price))}</p>
+          <div class="quantity-controls"><button class="qty-btn" data-action="decrease" data-product-id="${product.id}" aria-label="Giảm số lượng">−</button><span>${quantity}</span><button class="qty-btn" data-action="increase" data-product-id="${product.id}" aria-label="Tăng số lượng">+</button></div>
+        </div>
+        <div class="item-actions"><strong>${formatMoney(itemTotal)}</strong><button class="secondary-btn" data-action="remove" data-product-id="${product.id}">Xóa</button></div>
+      </div>`;
+    }).join('');
+    totalEl.textContent = formatMoney(total);
 
-      container.innerHTML = cart
-        .map((item) => {
-          const product = productMap.get(Number(item.productId));
-          if (!product) return '';
-
-          const itemTotal = Number(product.price) * Number(item.quantity || 1);
-          total += itemTotal;
-
-          return `
-            <div class="cart-item">
-              <img src="${product.image_url}" alt="${product.name}" />
-              <div class="item-info">
-                <h3>${product.name}</h3>
-                <p class="item-price">${product.formatted_price}</p>
-                <div class="quantity-controls">
-                  <button class="qty-btn" data-action="decrease" data-product-id="${product.id}">−</button>
-                  <span>${item.quantity}</span>
-                  <button class="qty-btn" data-action="increase" data-product-id="${product.id}">+</button>
-                </div>
-              </div>
-              <div class="item-actions">
-                <strong>${formatMoney(itemTotal)}</strong>
-                <button class="secondary-btn" data-action="remove" data-product-id="${product.id}">Xóa</button>
-              </div>
-            </div>
-          `;
-        })
-        .join('');
-
-      totalEl.textContent = formatMoney(total);
-
-      container.querySelectorAll('[data-action]').forEach((button) => {
-        const productId = Number(button.dataset.productId);
-        const action = button.dataset.action;
-
-        button.addEventListener('click', () => {
-          const currentCart = getCart();
-          const target = currentCart.find((item) => Number(item.productId) === productId);
-
-          if (!target) return;
-
-          if (action === 'increase') {
-            target.quantity += 1;
-          }
-
-          if (action === 'decrease') {
-            target.quantity -= 1;
-            if (target.quantity <= 0) {
-              const filtered = currentCart.filter((item) => Number(item.productId) !== productId);
-              saveCart(filtered);
-              renderCartPage();
-              return;
-            }
-          }
-
-          if (action === 'remove') {
-            saveCart(currentCart.filter((item) => Number(item.productId) !== productId));
-            renderCartPage();
-            return;
-          }
-
-          saveCart(currentCart);
-          renderCartPage();
-        });
-      });
-    })
-    .catch(() => {
-      container.innerHTML = '<div class="empty-cart">Không thể tải giỏ hàng.</div>';
-      totalEl.textContent = '0 ₫';
-    });
+    container.querySelectorAll('[data-action]').forEach((button) => button.addEventListener('click', () => {
+      const id = Number(button.dataset.productId);
+      const updated = getCart();
+      const item = updated.find((entry) => Number(entry.productId) === id);
+      if (!item) return;
+      if (button.dataset.action === 'remove') item.quantity = 0;
+      else item.quantity += button.dataset.action === 'increase' ? 1 : -1;
+      saveCart(updated.filter((entry) => Number(entry.quantity) > 0));
+      renderCartPage();
+    }));
+  } catch {
+    container.innerHTML = '<div class="empty-cart">Không thể tải giỏ hàng. Vui lòng thử lại.</div>';
+    totalEl.textContent = formatMoney(0);
+  }
 }
 
-function formatMoney(value) {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-async function checkout() {
+function setupCheckout() {
   const form = document.querySelector('#checkout-form');
   if (!form) return;
-
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-
-    const formData = new FormData(form);
-    const customer = {
-      name: formData.get('name'),
-      email: formData.get('email'),
-      phone: formData.get('phone'),
-      address: formData.get('address'),
-    };
-
-    const cart = getCart();
-    if (!cart.length) {
-      window.alert('Giỏ hàng của bạn đang trống.');
-      return;
-    }
-
-    const response = await fetch('/api/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customer, cart }),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      window.alert(data.error || 'Đã có lỗi xảy ra khi tạo đơn hàng.');
-      return;
-    }
-
-    if (data.url) {
+    const button = form.querySelector('button[type="submit"]');
+    button.disabled = true; button.textContent = 'Đang tạo đơn hàng...';
+    try {
+      const data = Object.fromEntries(new FormData(form).entries());
+      const response = await fetch('/api/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customer: data, cart: getCart() }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Đã có lỗi xảy ra.');
       localStorage.removeItem(CART_KEY);
-      window.location.href = data.url;
-    }
+      if (result.url) window.location.href = result.url;
+    } catch (error) { window.alert(error.message); button.disabled = false; button.textContent = 'Thanh toán bằng Stripe'; }
   });
 }
 
 function setupSuccessPage() {
   const orderElement = document.querySelector('#order-id');
   if (!orderElement) return;
-
-  const params = new URLSearchParams(window.location.search);
-  const orderId = params.get('order');
-  orderElement.textContent = orderId || 'N/A';
+  orderElement.textContent = new URLSearchParams(window.location.search).get('order') || 'N/A';
   localStorage.removeItem(CART_KEY);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   updateCartCount();
-
-  if (document.querySelector('#products-grid')) {
-    fetchProducts()
-      .then((products) => renderProducts(products))
-      .catch(() => {
-        document.querySelector('#products-grid').innerHTML = '<p>Không thể tải sản phẩm.</p>';
-      });
-  }
-
-  if (document.querySelector('#cart-items')) {
-    renderCartPage();
-    checkout();
-  }
-
-  if (document.querySelector('#order-id')) {
-    setupSuccessPage();
-  }
+  if (document.querySelector('#products-grid')) fetchProducts().then(renderProducts).catch(() => { document.querySelector('#products-grid').innerHTML = '<p>Không thể tải sản phẩm. Vui lòng thử lại sau.</p>'; });
+  if (document.querySelector('#cart-items')) { renderCartPage(); setupCheckout(); }
+  setupSuccessPage();
 });

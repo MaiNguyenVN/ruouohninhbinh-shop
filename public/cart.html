@@ -3,60 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Giỏ hàng Rượu Ó Ninh Bình" />
     <title>Giỏ hàng | Rượu Ó Ninh Bình</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <header class="topbar">
-      <div class="container nav">
-        <div class="brand">
-          <a href="/index.html">Rượu Ó Ninh Bình</a>
-        </div>
-        <nav>
-          <a href="/index.html">Sản phẩm</a>
-          <a href="/cart.html">Giỏ hàng <span id="cart-count" class="cart-badge">0</span></a>
-        </nav>
-      </div>
-    </header>
-
-    <main class="container page cart-page">
-      <section class="cart-layout">
-        <div class="cart-panel">
-          <h1>Giỏ hàng</h1>
-          <div id="cart-items" class="cart-items"></div>
-        </div>
-
-        <aside class="checkout-panel">
-          <h2>Thông tin thanh toán</h2>
-          <form id="checkout-form" class="checkout-form">
-            <label>
-              Họ và tên
-              <input type="text" name="name" required />
-            </label>
-            <label>
-              Email
-              <input type="email" name="email" required />
-            </label>
-            <label>
-              Số điện thoại
-              <input type="tel" name="phone" required />
-            </label>
-            <label>
-              Địa chỉ giao hàng
-              <textarea name="address" rows="4" required></textarea>
-            </label>
-
-            <div class="summary-row">
-              <span>Tổng cộng</span>
-              <strong id="cart-total">0 ₫</strong>
-            </div>
-
-            <button type="submit" class="primary-btn">Thanh toán bằng Stripe</button>
-          </form>
-        </aside>
-      </section>
-    </main>
-
+    <header class="topbar"><div class="container nav"><div class="brand"><a href="/index.html">Rượu OH</a></div><nav aria-label="Điều hướng"><a href="/index.html">Cửa hàng</a><a href="/cart.html">Giỏ hàng <span id="cart-count" class="cart-badge">0</span></a></nav></div></header>
+    <main class="container page"><section class="cart-layout"><div class="cart-panel"><h1>Giỏ hàng</h1><p>Những hương vị quê nhà bạn đã chọn.</p><div id="cart-items" class="cart-items"></div></div><aside class="checkout-panel"><h2>Thông tin giao hàng</h2><form id="checkout-form" class="checkout-form"><label>Họ và tên<input type="text" name="name" autocomplete="name" required /></label><label>Email<input type="email" name="email" autocomplete="email" required /></label><label>Số điện thoại<input type="tel" name="phone" autocomplete="tel" required /></label><label>Địa chỉ giao hàng<textarea name="address" rows="4" autocomplete="street-address" required></textarea></label><div class="summary-row"><span>Tổng cộng</span><strong id="cart-total">0 ₫</strong></div><button type="submit" class="primary-btn">Thanh toán bằng Stripe</button></form></aside></section></main>
     <script src="/app.js"></script>
   </body>
 </html>
