@@ -1,0 +1,19 @@
+{
+  "name": "ruouohninhbinh-shop",
+  "compatibility_date": "2025-01-01",
+  "main": "src/index.ts",
+  "assets": {
+    "directory": "./public"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ruouohninhbinh-db",
+      "database_id": "REPLACE_WITH_YOUR_DATABASE_ID"
+    }
+  ],
+  "vars": {
+    "CURRENCY": "vnd",
+    "STORE_NAME": "Rượu Ó Ninh Bình"
+  }
+}
